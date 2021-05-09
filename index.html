@@ -1,0 +1,490 @@
+<!doctype html>
+
+<head>
+
+  <title>ES-9 Configuration Tool</title>
+
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=PT+Sans" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=PT+Mono" />
+
+  <link rel="stylesheet" href="/css.css" type="text/css" />
+  <script src="/head.js" type="text/javascript" charset="utf-8"></script>
+
+</head>
+
+<body>
+
+  <div class="small" id="status"></div>
+
+  <div class="small">This version is for ES-9 firmware v1.2.0 and above.</div>
+
+  <p>
+    <button class="big" onclick="saveToFlash(1)">Save to Flash (Hosted)</button>
+    <button class="big" onclick="saveToFlash(0)">Save to Flash (Standalone)</button>
+    <button onclick="restoreFromFlash(1)">Load from Flash (Hosted)</button>
+    <button onclick="restoreFromFlash(0)">Load from Flash (Standalone)</button>
+    <button onclick="resetFlash()">Reset to Defaults</button>
+  </p>
+
+  <p>
+    Send to MIDI port: <select id="midioutput"></select>
+    Listen on MIDI port: <select id="midiinput" onchange='changeInput()'></select>
+    <button onclick="reqVersion()">Request ES-9 Version</button>
+    <button onclick="reqConfig()">Request Config</button>
+    <button onclick="reqUsage()">Request Usage</button>
+  </p>
+
+  <p>
+    <textarea rows=5 cols=50 id="log" class="log" readOnly></textarea>
+    <textarea rows=5 cols=45 name="text" id="txSysex"></textarea>
+    <textarea rows=5 cols=45 name="text" id="rxSysex"></textarea>
+  </p>
+
+  <table id="dc_table" class="routebox">
+    <tr>
+      <th colspan=7>Input DC Blocking</th>
+    </tr>
+    <tr>
+      <td>Inputs 1/2<input type='checkbox' id='dc_1' onChange='updateDC()'></td>
+      <td>Inputs 3/8<input type='checkbox' id='dc_2' onChange='updateDC()'></td>
+      <td>Inputs 4/5<input type='checkbox' id='dc_3' onChange='updateDC()'></td>
+      <td>Inputs 6/7<input type='checkbox' id='dc_4' onChange='updateDC()'></td>
+      <td>Inputs 9/10<input type='checkbox' id='dc_5' onChange='updateDC()'></td>
+      <td>Inputs 11/12<input type='checkbox' id='dc_6' onChange='updateDC()'></td>
+      <td>Inputs 13/14<input type='checkbox' id='dc_7' onChange='updateDC()'></td>
+    </tr>
+  </table>
+
+  <table id="options_table" class="routebox">
+    <tr>
+      <th colspan=7>Options</th>
+    </tr>
+    <tr>
+      <td>
+        <input type='radio' name='options_1' id='options_1_spdif' value='spdif' onChange='changeOptions(0)' checked><label for="options_1_spdif">S/PDIF</label>
+        <input type='radio' name='options_1' id='options_1_mixer' value='mixer' onChange='changeOptions(1)'><label for="options_1_mixer">Mixer 2</label>
+      </td>
+    </tr>
+  </table>
+
+  <table id="channels_table" class="routebox">
+    <tr>
+      <th colspan=7>Mixer MIDI channels</th>
+    </tr>
+    <tr>
+      <td>
+        <label for="midi_ch_usb">USB: </label>
+        <select id="midi_ch_usb" onchange='changeMIDIChannels()'>
+          <option value='0'>Off</option>
+          <script>
+            var i;
+            for ( i=1; i<=16; ++i ) {
+              document.write( '<option value=' + i + '>' + i + '</option>' );
+            }
+          </script>
+        </select>
+        <label for="midi_ch_din">DIN: </label>
+        <select id="midi_ch_din" onchange='changeMIDIChannels()'>
+          <option value='0'>Off</option>
+          <script>
+            var i;
+            for ( i=1; i<=16; ++i ) {
+              document.write( '<option value=' + i + '>' + i + '</option>' );
+            }
+          </script>
+        </select>
+      </td>
+    </tr>
+  </table>
+
+  <br>
+
+  <script>
+
+  var inputCaptureLookup = [ 0x78, 0x79, 0x76, 0x75, 0x74, 0x7b, 0x7a, 0x77, 0x73, 0x72, 0x7d, 0x7c, 0x7e, 0x7f ]
+  function writeCaptureSelect( dsp, ch ) {
+    var id = "cs" + dsp + "_" + ch;
+    var str = "<td class=ic><select id=" + id + " onChange='updateCapture(" + dsp + ", " + ch + ")'>";
+    var i;
+    for ( i=0; i<14; ++i ) {
+      str += "<option value=" + (0x70+i) + ">Input " + (i+1) + "</option>";
+    }
+    for ( i=0; i<16; ++i ) {
+      str += "<option value=" + (0x60+i) + ">Bus " + (i+1) + "</option>";
+    }
+    for ( i=0; i<8; ++i ) {
+      str += "<option value=" + (0x00+i) + ">USB " + (i+1) + "</option>";
+    }
+    for ( i=0; i<8; ++i ) {
+      str += "<option value=" + (0x10+i) + ">USB " + (i+9) + "</option>";
+    }
+    for ( i=0; i<8; ++i ) {
+      str += "<option value=" + (0x20+i) + ">MIX " + (i+1) + "</option>";
+    }
+    str += "<option value=48>S/PDIF L</option><option value=49>S/PDIF R</option>";
+    str += "</select></td>";
+    document.write( str );
+  }
+  function writeOutputSelect( dsp, ch ) {
+    var id = "os" + dsp + "_" + ch;
+    var str = "<td class=ic><select id=" + id + " onChange='updateOutputs(" + dsp + ")'>";
+    str += "<option value=6>Main Out L</option><option value=7>Main Out R</option>";
+    str += "<option value=12>Phones L</option><option value=13>Phones R</option>";
+    str += "<option value=14>ES-5 L</option><option value=15>ES-5 R</option>";
+    str += "<option value=8>Output 1</option><option value=9>Output 2</option>";
+    str += "<option value=4>Output 3</option><option value=5>Output 4</option>";
+    str += "<option value=2>Output 5</option><option value=3>Output 6</option>";
+    str += "<option value=11>Output 7</option><option value=10>Output 8</option>";
+    var i;
+    for ( i=0; i<16; ++i ) {
+      str += "<option value=" + (0x10+i) + ">Bus " + (i+1) + "</option>";
+    }
+    str += "</select></td>";
+    document.write( str );
+  }
+
+  </script>
+
+  <table id="dsp01_table" class="routebox">
+  <tr>
+  <script>
+    var i;
+    for ( i=0; i<8; ++i ) {
+      writeCaptureSelect( 0, i );
+    }
+    for ( i=0; i<8; ++i ) {
+      writeCaptureSelect( 1, i );
+    }
+  </script>
+  </tr>
+  <tr>
+  <script>
+    var i;
+    for ( i=1; i<=16; ++i ) {
+      document.write( "<th>" + i + "</th>");
+    }
+  </script>
+  </tr>
+  <tr><th colspan=16>&#x21E9;<br>USB audio<br>&#x21E9;</th></tr>
+  <tr>
+  <script>
+    var i;
+    for ( i=1; i<=16; ++i ) {
+      document.write( "<th>" + i + "</th>");
+    }
+  </script>
+  </tr>
+  <tr>
+  <script>
+    var i;
+    for ( i=0; i<8; ++i ) {
+      writeOutputSelect( 0, i );
+    }
+    for ( i=0; i<8; ++i ) {
+      writeOutputSelect( 1, i );
+    }
+  </script>
+  </tr>
+  </table>
+
+  <br>
+
+  <table id="dsp2_table" class="routebox">
+  <tr>
+  <script>
+    var i;
+    for ( i=0; i<8; ++i ) {
+      writeCaptureSelect( 2, i );
+    }
+  </script>
+  </tr>
+  <tr>
+  <script>
+    var i;
+    for ( i=1; i<=8; ++i ) {
+      document.write( "<th>" + i + "</th>");
+    }
+  </script>
+  </tr>
+  <tr><th colspan=8>&#x21E9;<br>Mixer<br>&#x21E9;</th></tr>
+  <tr>
+  <script>
+    var i;
+    for ( i=1; i<=8; ++i ) {
+      document.write( "<th>" + i + "</th>");
+    }
+  </script>
+  </tr>
+  <tr>
+  <script>
+    var i;
+    for ( i=0; i<8; ++i ) {
+      writeOutputSelect( 2, i );
+    }
+  </script>
+  </tr>
+  </table>
+
+  <table id="dsp3_table" class="routebox">
+  <tr>
+  <script>
+    var i;
+    for ( i=0; i<8; ++i ) {
+      writeCaptureSelect( 3, i );
+    }
+  </script>
+  </tr>
+  <tr>
+  <script>
+    var i;
+    for ( i=1; i<=8; ++i ) {
+      document.write( "<th id='cl3_" + (i-1) + "'>" + i + "</th>");
+    }
+  </script>
+  </tr>
+  <tr><th colspan=8 id="dsp3_table_label">&#x21E9;<br>Mixer 2<br>&#x21E9;</th></tr>
+  <tr>
+  <script>
+    var i;
+    for ( i=1; i<=8; ++i ) {
+      document.write( "<th id='ol3_" + (i-1) + "'>" + i + "</th>");
+    }
+  </script>
+  </tr>
+  <tr>
+  <script>
+    var i;
+    for ( i=0; i<8; ++i ) {
+      writeOutputSelect( 3, i );
+    }
+  </script>
+  </tr>
+  </table>
+
+  <br>
+
+  <table id="link_table" class="routebox">
+  <tr>
+  <th colspan=8>Stereo Links</th>
+  </tr>
+  <tr>
+  <script>
+    var i;
+    for ( i=0; i<13; i+=2 ) {
+      document.write( "<td class='linkcb'>Inputs " + (i+1) + "/" + (i+2) + "<input type='checkbox' id='link7_" + i + "' onChange='updateLink(" + (i/2) + ", this)'></td>");
+    }
+  </script>
+  </tr>
+  <tr>
+  <script>
+    var i;
+    for ( i=0; i<15; i+=2 ) {
+      document.write( "<td class='linkcb'>Bus " + (i+1) + "/" + (i+2) + "<input type='checkbox' id='link6_" + i + "' onChange='updateLink(" + (8+(i/2)) + ", this)'></td>");
+    }
+  </script>
+  </tr>
+  <tr>
+  <script>
+    var i;
+    for ( i=0; i<7; i+=2 ) {
+      document.write( "<td class='linkcb'>USB " + (i+1) + "/" + (i+2) + "<input type='checkbox' id='link0_" + i + "' onChange='updateLink(" + (16+(i/2)) + ", this)'></td>");
+    }
+    for ( i=0; i<7; i+=2 ) {
+      document.write( "<td class='linkcb'>USB " + (i+9) + "/" + (i+10) + "<input type='checkbox' id='link1_" + i + "' onChange='updateLink(" + (20+(i/2)) + ", this)'></td>");
+    }
+  </script>
+  </tr>
+  <tr>
+  <script>
+    var i;
+    for ( i=0; i<7; i+=2 ) {
+      document.write( "<td class='linkcb'>Mix " + (i+1) + "/" + (i+2) + "<input type='checkbox' id='link2_" + i + "' onChange='updateLink(" + (24+(i/2)) + ", this)'></td>");
+    }
+    for ( i=0; i<7; i+=2 ) {
+      document.write( "<td class='linkcb'>Mix " + (i+9) + "/" + (i+10) + "<input type='checkbox' id='link3_" + i + "' onChange='updateLink(" + (28+(i/2)) + ", this)'></td>");
+    }
+  </script>
+  </tr>
+  </table>
+
+  <br>
+  <span class='mixtitle'>Macro mix</span> - controls the raw mix below, respecting stereo links
+
+  <div id='vmixer'></div>
+  <script>
+  function buildStereoMixer( m ) {
+    var str = '<table id=vmix' + m + ' class="mixtable">' ;
+    var i;
+    var row1 = "<tr>";
+    var row2 = "<tr>";
+    var row3 = "<tr>";
+    for ( i=0; i<8; ++i ) {
+      var id = "vmixcht" + m + "_" + i;
+      row1 += "<td><div id=" + id + " class='mixchtag'></div></td>";
+      row1 += "<td></td>";
+
+      var id = "mix" + m + "_" + i;
+      var raw = document.getElementById( id ).value;
+      var db = mixToDb( raw );
+      var vm = dbToVmix( db );
+
+      var id = "vmix" + m + "_" + i;
+      row2 += "<td class='mix'><input type='range' min='0' max='127' value='" + vm + "' step='1' class='mix' onInput='vmixSlider( " + m + ", " + i + ", 1 )' ondblclick='vmixDoubleClick( " + m + ", " + i + ", 1 )' id=" + id + "></td>";
+      var id = "vpan" + m + "_" + i;
+      row2 += "<td class='pan'><input type='range' min='-63' max='63' value='0' step='1' class='pan' onInput='vpanSlider( " + m + ", " + i + ", 1 )' ondblclick='doubleClick(\"" + id + "\", 0);vpanSlider( " + m + ", " + i + ", 1 )' id=" + id + "></td>";
+
+      var id = "vmixt" + m + "_" + i;
+      row3 += "<td id=" + id + " class='mixt'>0</td>";
+      var id = "vpant" + m + "_" + i;
+      row3 += "<td id=" + id + " class='mixt'>0</td>";
+
+      if ( (i&1) == 0 ) {
+        var v = document.getElementById( "cs" + (2+(m>>3)) + "_" + i ).value;
+        if ( document.getElementById( "link" + (v>>4) + "_" + (v&0xe) ).checked ) {
+          i += 1;
+        }
+      }
+    }
+    str += row1 + "</tr>" + row2 + "</tr>" + row3 + "</tr>";
+    str += "<tr><td colspan=16 class=mixtag id=vmixtag" + m + "></td></tr>";
+    str += '</table>';
+    return str;
+  }
+  function buildMonoMixer( m ) {
+    var str = '<table id=vmix' + m + ' class="mixtable">' ;
+    var i;
+    var row1 = "<tr>";
+    var row2 = "<tr>";
+    var row3 = "<tr>";
+    for ( i=0; i<8; ++i ) {
+      var id = "vmixcht" + m + "_" + i;
+      row1 += "<td><div id=" + id + " class='mixchtag'></div></td>";
+
+      var id = "mix" + m + "_" + i;
+      var raw = document.getElementById( id ).value;
+      var db = mixToDb( raw );
+      var vm = dbToVmix( db );
+
+      var id = "vmix" + m + "_" + i;
+      row2 += "<td class='mix'><input type='range' min='0' max='127' value='" + vm + "' step='1' class='mix' onInput='vmixSlider( " + m + ", " + i + ", 0 )' ondblclick='vmixDoubleClick( " + m + ", " + i + ", 0 )' id=" + id + "></td>";
+
+      var id = "vmixt" + m + "_" + i;
+      row3 += "<td id=" + id + " class='mixt'>0</td>";
+
+      if ( (i&1) == 0 ) {
+        var v = document.getElementById( "cs" + (2+(m>>3)) + "_" + i ).value;
+        if ( document.getElementById( "link" + (v>>4) + "_" + (v&0xe) ).checked ) {
+          i += 1;
+        }
+      }
+    }
+    str += row1 + "</tr>" + row2 + "</tr>" + row3 + "</tr>";
+    str += "<tr><td colspan=8 class=mixtag id=vmixtag" + m + "></td></tr>";
+    str += '</table>';
+    return str;
+  }
+  function rebuildMixer()
+  {
+    var str = "";
+    var i;
+    for ( i=0; i<7; i+=2 ) {
+      if ( document.getElementById( "link2_" + i ).checked ) {
+        str += buildStereoMixer( i );
+      } else {
+        str += buildMonoMixer( i );
+        str += buildMonoMixer( i+1 );
+      }
+    }
+    if ( document.getElementById( "options_1_mixer" ).checked ) {
+      str += "<br>";
+      for ( i=0; i<7; i+=2 ) {
+        if ( document.getElementById( "link3_" + i ).checked ) {
+          str += buildStereoMixer( 8+i );
+        } else {
+          str += buildMonoMixer( 8+i );
+          str += buildMonoMixer( 8+i+1 );
+        }
+      }
+    }
+    document.getElementById( "vmixer" ).innerHTML = str;
+    for ( i=0; i<16; ++i ) {
+      updateMixTag( i );
+      var ch;
+        for ( ch=0; ch<8; ++ch ) {
+        updateVMixText( i, ch );
+        updateVPanText( i, ch );
+      }
+    }
+      for ( i=0; i<8; ++i ) {
+      updateMixChTag( 2, i );
+      updateMixChTag( 3, i );
+    }
+
+    if ( midi ) {
+      var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+      var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x19, 0x2A, 0xF7 ];
+      output.send( arr );
+      var dd = log( "sent mix request to ES-9" );
+      dumpSysex( arr, "txSysex", dd+"\n" );
+    }
+  }
+  </script>
+
+  <p>
+  <hr>
+  <span class='mixtitle'>Raw mix</span> - the actual mix matrix running on the hardware
+  <br>
+
+  <script>
+  var m;
+  for ( m=0; m<16; ++m ) {
+    var id = "mix" + m;
+    document.write( '<table id=' + id + ' class="mixtable">' );
+    var i;
+    var str = "<tr>";
+    for ( i=0; i<8; ++i ) {
+      var id = "mixcht" + m + "_" + i;
+      str += "<td><div id=" + id + " class='mixchtag'></div></td>";
+    }
+    str += "</tr><tr>";
+    for ( i=0; i<8; ++i ) {
+      var id = "mix" + m + "_" + i;
+      str += "<td class='mix'><input type='range' min='0' max='32767' value='0' step='1' class='mix' onInput='mixSlider( " + m + ", " + i + ")' id=" + id + "></td>";
+    }
+    str += "</tr>";
+    document.write( str );
+    var str = "<tr>";
+    for ( i=0; i<8; ++i ) {
+      var id = "mixt" + m + "_" + i;
+      str += "<td id=" + id + " class='mixt'>0</td>";
+    }
+    str += "</tr><tr><td colspan=8 class=mixtag id=mixtag" + m + "></td></tr>";
+    document.write( str );
+    document.write( '</table>' );
+    if ( (m&3) == 3 && m < 15 ) {
+      document.write( '<br>' );
+    }
+  }
+  </script>
+
+  <hr>
+  <span class='mixtitle'>Output DC offsets</span> - can only be applied if a mixer is routed to the output
+  <br>
+
+  <script>
+  function doubleClick(id, v) {
+    document.getElementById( id ).value = v;
+  }
+  var ch;
+  document.write( '<table id=outDC class="mixtable">' );
+  for ( ch=0; ch<8; ++ch ) {
+    var id = "outDC_" + ch;
+    document.write( "<tr><td class='outDCtag'>Output " + (ch+1) + "</td><td id=" + id + "t class='outDCt'>0</td>" );
+    document.write( "<td class='mix'><input type='range' min='-3176' max='3176' value='0' step='1' class='dc' onInput='outDCSlider(" + ch + ")' ondblclick='doubleClick(\"" + id + "\", 0);outDCSlider(" + ch + ")' id=" + id + "></td></tr>" );
+  }
+  document.write( '</table>' );
+  </script>
+
+  <script src="/tail.js" type="text/javascript" charset="utf-8"></script>
+
+</body>

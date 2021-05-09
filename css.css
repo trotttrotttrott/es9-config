@@ -1,0 +1,171 @@
+body {
+  font-family: 'PT Sans', serif;
+  font-size: 16px;
+}
+
+button.big {
+  font-size: 120%;
+}
+
+input, select, button {
+  font-family: 'PT Sans', serif;
+  font-size: 11px;
+}
+
+div.small {
+  font-size: 80%;
+}
+
+table {
+  margin-bottom: 5px;
+}
+
+table.routebox {
+  border: 1px solid black;
+  display: inline-block;
+}
+
+table.mixtable {
+  border: 1px solid black;
+  display: inline-block;
+  margin-right: 10px;
+}
+
+td.tc {
+  text-align: center;
+  background-color: #c0c0c0;
+  font-size: 80%;
+}
+
+td.tc_a {
+  text-align: center;
+  background-color: #e0e0e0;
+  font-size: 80%;
+}
+
+td.ic {
+  text-align: center;
+}
+
+tr.a {
+  background-color: #e0e0e0;
+}
+
+th {
+  background-color: #c0c0c0;
+  font-size: 80%;
+}
+
+td.mix {
+  width: 30px;
+  padding-left: 0px;
+  padding-right: 0px;
+}
+
+td.mixt {
+  text-align: center;
+  font-size: 50%;
+}
+
+td.mixtag {
+  text-align: center;
+  font-size: 80%;
+  background: #f0f0f0;
+}
+
+td.linkcb {
+  text-align: right;
+  font-size: 80%;
+}
+
+div.mixchtag {
+  text-align: left;
+  font-size: 60%;
+  transform: rotate(-90deg);
+  width: 40px;
+  margin: 10px -10px 15px -10px;
+}
+
+textarea {
+  font-family: 'PT Mono', monospace;
+  font-size: 11px;
+}
+
+td.outDCt {
+  text-align: center;
+  font-size: 50%;
+  width:100px;
+}
+
+td.outDCtag {
+  text-align: center;
+  font-size: 80%;
+  background: #f0f0f0;
+  width:150px;
+}
+
+input.dc {
+  width: 800px;
+  -webkit-appearance: none;
+  border: 1px solid #e6e6e6;
+  background-color: #e6e6e6;
+}
+
+input.mix {
+  -webkit-appearance: slider-vertical;
+  width: 20px;
+  height: 128px;
+}
+
+input[type="range"].pan {
+  cursor: pointer;
+  width: 100px !important;
+  -webkit-appearance: none;
+  z-index: 200;
+  width: 10px;
+  border: 1px solid #e6e6e6;
+  background-color: #e6e6e6;
+  background-image: -webkit-linear-gradient(right, #e6e6e6, #d2d2d2);
+}
+
+input[type="range"].pan:focus {
+  border: 0 !imporant;
+  outline: none !important;
+}
+
+input[type="range"].pan::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  background-color: #555;
+  background-image: -webkit-linear-gradient(right, #4DDBFF, #00CCFF);
+}
+
+input[type="range"].pan {
+  -webkit-border-radius: 20px;
+}
+
+input[type="range"].pan::-webkit-slider-thumb {
+  -webkit-border-radius: 5px;
+}
+
+input.pan {
+  -webkit-transform:rotate(270deg);
+  margin-left: -65px;
+  margin-right: -60px;
+}
+
+td.pan {
+  width: 20px;
+  padding-left: 0px;
+  padding-right: 0px;
+  text-align: center;
+}
+
+.mixtitle {
+  font-weight: bold;
+  font-size: 120%;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  display: inline-block;
+}
